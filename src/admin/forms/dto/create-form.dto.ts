@@ -14,17 +14,17 @@ export class CreateFormDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  formKey: string;
+  formKey!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  nameEn: string;
+  nameEn!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  nameAr: string;
+  nameAr!: string;
 
   @IsOptional()
   @IsString()
