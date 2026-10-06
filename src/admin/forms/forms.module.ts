@@ -13,6 +13,8 @@ import { FormFieldRows } from '../../entities/FormFieldRows';
 import { FormFieldCalculations } from '../../entities/FormFieldCalculations';
 import { FormFieldCalculationInputs } from '../../entities/FormFieldCalculationInputs';
 import { KpiDefinitions } from '../../entities/KpiDefinitions';
+import { Frequencies } from '../../entities/Frequencies';
+import { KpiSubmissionPeriods } from '../../entities/KpiSubmissionPeriods';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { KpiDefinitions } from '../../entities/KpiDefinitions';
       FormFieldCalculations,
       FormFieldCalculationInputs,
       KpiDefinitions,
+      Frequencies,
+      KpiSubmissionPeriods,
     ]),
   ],
   controllers: [FormsController, FieldsController],

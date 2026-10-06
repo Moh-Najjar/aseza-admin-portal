@@ -14,12 +14,12 @@ export class CreateRowDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  rowKey: string;
+  rowKey!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(300)
-  labelEn: string;
+  labelEn!: string;
 
   @IsOptional()
   @IsString()
@@ -28,7 +28,7 @@ export class CreateRowDto {
 
   @IsInt()
   @Min(0)
-  displayOrder: number;
+  displayOrder!: number;
 
   @IsOptional()
   @IsBoolean()

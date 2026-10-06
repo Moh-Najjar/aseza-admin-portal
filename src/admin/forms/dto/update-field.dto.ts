@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsDateString,
   IsInt,
   IsNumber,
   IsOptional,
@@ -7,6 +8,7 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 /** All fields optional — only provided fields are updated (PATCH semantics) */
@@ -45,6 +47,24 @@ export class UpdateFieldDto {
   @IsInt()
   @IsPositive()
   kpiId?: number;
+
+  /**
+   * Updates dbo.KpiDefinitions.FrequencyId on the field's linked KPI.
+   * Requires the field to have a KpiId (auto-created on POST when omitted).
+   */
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  frequencyId?: number;
+
+  /**
+   * Recurring period start (YYYY-MM-DD). Stored on KpiDefinitions.ReferenceDate.
+   * Send null to reset to 1 January.
+   */
+  @ValidateIf((_, value: unknown) => value !== null)
+  @IsOptional()
+  @IsDateString()
+  periodStartDate?: string | null;
 
   @IsOptional()
   @IsBoolean()

@@ -21,37 +21,37 @@ export class CreateCalculationInputDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
-  inputToken: string;
+  inputToken!: string;
 
   /** Machine-readable column key — e.g. "QUANTITY" */
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  columnKey: string;
+  columnKey!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  labelEn: string;
+  labelEn!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  labelAr: string;
+  labelAr!: string;
 
   /** FK to dbo.DataTypes */
   @IsInt()
   @IsPositive()
-  dataTypeId: number;
+  dataTypeId!: number;
 
   /** FK to dbo.ControlTypes */
   @IsInt()
   @IsPositive()
-  controlTypeId: number;
+  controlTypeId!: number;
 
   @IsInt()
   @Min(0)
-  displayOrder: number;
+  displayOrder!: number;
 
   @IsOptional()
   @IsString()
@@ -95,17 +95,17 @@ export class CreateCalculationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
-  formulaExpression: string;
+  formulaExpression!: string;
 
   /** FK to dbo.DataTypes for the calculated result */
   @IsInt()
   @IsPositive()
-  resultDataTypeId: number;
+  resultDataTypeId!: number;
 
   /** FK to dbo.ControlTypes for how the result is rendered */
   @IsInt()
   @IsPositive()
-  resultControlTypeId: number;
+  resultControlTypeId!: number;
 
   @IsOptional()
   @IsString()
@@ -162,5 +162,5 @@ export class CreateCalculationDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateCalculationInputDto)
-  inputs: CreateCalculationInputDto[];
+  inputs!: CreateCalculationInputDto[];
 }

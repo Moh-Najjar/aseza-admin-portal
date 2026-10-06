@@ -29,7 +29,7 @@ export class FormsService {
 
     @InjectRepository(FormFields)
     private readonly fieldsRepo: Repository<FormFields>,
-  ) { }
+  ) {}
 
   /**
    * POST /admin/forms

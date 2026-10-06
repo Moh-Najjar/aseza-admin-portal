@@ -29,6 +29,9 @@ export class FormFieldColumns {
   @Column('int', { name: 'DisplayOrder', default: () => '(0)' })
   displayOrder: number;
 
+  @Column('bit', { name: 'IsRequired', nullable: true })
+  isRequired: boolean | null;
+
   // Explicit FK columns
   @Column('int', { name: 'FieldId' })
   fieldId: number;

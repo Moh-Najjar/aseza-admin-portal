@@ -15,21 +15,67 @@ import { FormFieldCalculations } from '../../entities/FormFieldCalculations';
 import { FormFieldCalculationInputs } from '../../entities/FormFieldCalculationInputs';
 import { Forms } from '../../entities/Forms';
 import { KpiDefinitions } from '../../entities/KpiDefinitions';
+import { Frequencies } from '../../entities/Frequencies';
+import { KpiSubmissionPeriods } from '../../entities/KpiSubmissionPeriods';
 import { CreateFieldDto } from './dto/create-field.dto';
 import { UpdateFieldDto } from './dto/update-field.dto';
+import { AssignFieldFrequencyDto } from './dto/assign-field-frequency.dto';
 import { CreateOptionDto } from './dto/create-option.dto';
 import { CreateDependencyDto } from './dto/create-dependency.dto';
 import { CreateColumnDto } from './dto/create-column.dto';
 import { CreateRowDto } from './dto/create-row.dto';
+import { UpdateColumnDto } from './dto/update-column.dto';
+import { UpdateRowDto } from './dto/update-row.dto';
 import {
   CreateCalculationDto,
   CreateCalculationInputDto,
 } from './dto/create-calculation.dto';
+import { FrequencyPeriodsQueryDto } from '../../common/dto/frequency-periods-query.dto';
+import {
+  ExpectedPeriod,
+  FrequencySummary,
+  PeriodAnchor,
+  formatDateOnly,
+  generateExpectedPeriods,
+  hasDiscretePeriods,
+  parsePeriodStartDate,
+  periodAnchorFromDate,
+  supportsCustomPeriodStart,
+} from '../../common/frequency/frequency-periods';
 import {
   FIELD_RESPONSE_RELATIONS,
   FormFieldResponse,
   mapFormFieldToResponse,
 } from './mappers/form-field.mapper';
+
+/** One row from dbo.KpiSubmissionPeriods — created when a form is actually submitted. */
+export interface SubmittedPeriod {
+  kpiSubmissionPeriodId: string;
+  submissionId: string;
+  directorateId: number;
+  kpiId: number;
+  frequencyId: number;
+  periodStartDate: string;
+  submissionStatus: string;
+  createdAt: Date;
+}
+
+/**
+ * Field frequency payload:
+ * - `frequency` comes from dbo.Frequencies via dbo.KpiDefinitions
+ * - `expectedPeriods` are calendar windows computed from the frequency code
+ * - `submittedPeriods` are real rows from dbo.KpiSubmissionPeriods
+ */
+export interface FieldFrequencyResponse {
+  fieldId: number;
+  kpiId: number | null;
+  frequencyId: number | null;
+  frequency: FrequencySummary | null;
+  /** Recurring start from KpiDefinitions.ReferenceDate (YYYY-MM-DD), or null for 1 Jan. */
+  periodStartDate: string | null;
+  expectedPeriods: ExpectedPeriod[];
+  submittedPeriods: SubmittedPeriod[];
+}
 
 @Injectable()
 export class FieldsService {
@@ -60,6 +106,12 @@ export class FieldsService {
 
     @InjectRepository(KpiDefinitions)
     private readonly kpiRepo: Repository<KpiDefinitions>,
+
+    @InjectRepository(Frequencies)
+    private readonly frequenciesRepo: Repository<Frequencies>,
+
+    @InjectRepository(KpiSubmissionPeriods)
+    private readonly periodsRepo: Repository<KpiSubmissionPeriods>,
   ) {}
 
   // ─── Fields ──────────────────────────────────────────────────────────────
@@ -76,7 +128,10 @@ export class FieldsService {
     return fields.map(mapFormFieldToResponse);
   }
 
-  async addField(formId: number, dto: CreateFieldDto): Promise<FormFieldResponse> {
+  async addField(
+    formId: number,
+    dto: CreateFieldDto,
+  ): Promise<FormFieldResponse> {
     const form = await this.formsRepo.findOne({ where: { formId } });
 
     if (!form) {
@@ -165,9 +220,20 @@ export class FieldsService {
 
     await this.fieldsRepo.save(field);
 
-    // isActive lives on the linked KPI — persist after field save so kpiId changes apply first
+    // isActive and frequency live on the linked KPI — persist after field save so kpiId changes apply first
     if (dto.isActive !== undefined) {
       await this.updateFieldKpiActive(field.kpiId, dto.isActive);
+    }
+
+    if (dto.frequencyId !== undefined) {
+      await this.updateFieldKpiFrequency(
+        field,
+        formId,
+        dto.frequencyId,
+        dto.periodStartDate,
+      );
+    } else if (dto.periodStartDate !== undefined) {
+      await this.updateFieldKpiPeriodStart(field, dto.periodStartDate);
     }
 
     return this.loadFieldResponse(fieldId);
@@ -176,6 +242,44 @@ export class FieldsService {
   async removeField(formId: number, fieldId: number): Promise<void> {
     const field = await this.assertFieldBelongsToForm(formId, fieldId);
     await this.fieldsRepo.remove(field);
+  }
+
+  // ─── Field frequency ──────────────────────────────────────────────────────
+
+  /**
+   * GET /admin/forms/:formId/fields/:fieldId/frequency
+   * Returns the catalog frequency on the field's KPI, the calendar windows for
+   * that frequency, and any submitted rows from dbo.KpiSubmissionPeriods.
+   */
+  async getFieldFrequency(
+    formId: number,
+    fieldId: number,
+    query: FrequencyPeriodsQueryDto,
+  ): Promise<FieldFrequencyResponse> {
+    await this.assertFieldBelongsToForm(formId, fieldId);
+    return this.buildFieldFrequencyResponse(fieldId, query);
+  }
+
+  /**
+   * PUT /admin/forms/:formId/fields/:fieldId/frequency
+   * Sets dbo.KpiDefinitions.FrequencyId for this field.
+   * Does NOT insert into dbo.KpiSubmissionPeriods — that table is filled when
+   * a form is submitted for a specific period.
+   */
+  async assignFieldFrequency(
+    formId: number,
+    fieldId: number,
+    dto: AssignFieldFrequencyDto,
+    query: FrequencyPeriodsQueryDto,
+  ): Promise<FieldFrequencyResponse> {
+    const field = await this.assertFieldBelongsToForm(formId, fieldId);
+    await this.updateFieldKpiFrequency(
+      field,
+      formId,
+      dto.frequencyId,
+      dto.periodStartDate,
+    );
+    return this.buildFieldFrequencyResponse(fieldId, query);
   }
 
   // ─── Field Options ────────────────────────────────────────────────────────
@@ -289,7 +393,34 @@ export class FieldsService {
       dataTypeId: dto.dataTypeId,
       controlTypeId: dto.controlTypeId,
       lookupTypeId: dto.lookupTypeId ?? null,
+      isRequired: dto.isRequired ?? null,
     });
+
+    return this.columnsRepo.save(column);
+  }
+
+  async updateColumn(
+    formId: number,
+    fieldId: number,
+    columnId: number,
+    dto: UpdateColumnDto,
+  ): Promise<FormFieldColumns> {
+    this.assertHasUpdates(dto);
+    await this.assertFieldBelongsToForm(formId, fieldId);
+
+    const column = await this.columnsRepo.findOne({
+      where: { columnId, fieldId },
+    });
+
+    if (!column) {
+      throw new NotFoundException(
+        `Column ${columnId} not found on field ${fieldId}`,
+      );
+    }
+
+    if (dto.labelEn !== undefined) column.labelEn = dto.labelEn;
+    if (dto.labelAr !== undefined) column.labelAr = dto.labelAr;
+    if (dto.isRequired !== undefined) column.isRequired = dto.isRequired;
 
     return this.columnsRepo.save(column);
   }
@@ -340,6 +471,28 @@ export class FieldsService {
       validationMessageEn: dto.validationMessageEn ?? null,
       validationMessageAr: dto.validationMessageAr ?? null,
     });
+
+    return this.rowsRepo.save(row);
+  }
+
+  async updateRow(
+    formId: number,
+    fieldId: number,
+    rowId: number,
+    dto: UpdateRowDto,
+  ): Promise<FormFieldRows> {
+    this.assertHasUpdates(dto);
+    await this.assertFieldBelongsToForm(formId, fieldId);
+
+    const row = await this.rowsRepo.findOne({ where: { rowId, fieldId } });
+
+    if (!row) {
+      throw new NotFoundException(`Row ${rowId} not found on field ${fieldId}`);
+    }
+
+    if (dto.labelEn !== undefined) row.labelEn = dto.labelEn;
+    if (dto.labelAr !== undefined) row.labelAr = dto.labelAr;
+    if (dto.isRequired !== undefined) row.isRequired = dto.isRequired;
 
     return this.rowsRepo.save(row);
   }
@@ -530,6 +683,20 @@ export class FieldsService {
 
   // ─── Private helpers ──────────────────────────────────────────────────────
 
+  /** PATCH bodies must change at least one property */
+  private assertHasUpdates(dto: UpdateColumnDto | UpdateRowDto): void {
+    const hasUpdate =
+      dto.labelEn !== undefined ||
+      dto.labelAr !== undefined ||
+      dto.isRequired !== undefined;
+
+    if (!hasUpdate) {
+      throw new BadRequestException(
+        'Request body must include at least one of: labelEn, labelAr, isRequired',
+      );
+    }
+  }
+
   /**
    * Returns an existing kpiId from the DTO, or auto-creates a KpiDefinitions row
    * using the parent form's directorateId/frequencyId and the field labels.
@@ -543,18 +710,49 @@ export class FieldsService {
       if (!exists) {
         throw new NotFoundException(`KPI with id ${dto.kpiId} not found`);
       }
+
+      // Caller may also pin a frequency / period start onto an existing KPI
+      if (dto.frequencyId !== undefined) {
+        await this.assertFrequencyExists(dto.frequencyId);
+        await this.kpiRepo.update(
+          { kpiId: dto.kpiId },
+          { frequencyId: dto.frequencyId },
+        );
+      }
+      if (dto.periodStartDate !== undefined) {
+        const frequencyId =
+          dto.frequencyId ??
+          (await this.kpiRepo.findOne({ where: { kpiId: dto.kpiId } }))
+            ?.frequencyId;
+        if (frequencyId !== undefined && frequencyId !== null) {
+          const frequency = await this.assertFrequencyExists(frequencyId);
+          this.assertPeriodStartAllowed(frequency.code, dto.periodStartDate);
+        }
+        await this.kpiRepo.update(
+          { kpiId: dto.kpiId },
+          { referenceDate: this.toReferenceDate(dto.periodStartDate) },
+        );
+      }
+
       return dto.kpiId;
     }
 
-    const kpiCode = await this.buildUniqueKpiCode(
-      form.formKey,
-      dto.fieldKey,
-    );
+    const kpiCode = await this.buildUniqueKpiCode(form.formKey, dto.fieldKey);
 
     if (form.directorateId === null) {
       throw new BadRequestException(
         'Form must have a directorateId before a field KPI can be auto-created',
       );
+    }
+
+    const frequencyId = await this.resolveFrequencyId(
+      dto.frequencyId,
+      form.frequencyId,
+    );
+
+    if (dto.periodStartDate !== undefined && frequencyId !== null) {
+      const frequency = await this.assertFrequencyExists(frequencyId);
+      this.assertPeriodStartAllowed(frequency.code, dto.periodStartDate);
     }
 
     const kpi = this.kpiRepo.create({
@@ -563,7 +761,10 @@ export class FieldsService {
       nameAr: dto.labelAr,
       directorateId: form.directorateId,
       dataTypeId: dto.dataTypeId,
-      frequencyId: form.frequencyId,
+      frequencyId,
+      referenceDate: dto.periodStartDate
+        ? this.toReferenceDate(dto.periodStartDate)
+        : null,
       isActive: true,
     });
 
@@ -611,6 +812,298 @@ export class FieldsService {
 
     kpi.isActive = isActive;
     await this.kpiRepo.save(kpi);
+  }
+
+  /**
+   * Sets FrequencyId (and optional period start) on the KPI linked to a form field.
+   * Auto-creates a KPI when the field does not have one yet.
+   */
+  private async updateFieldKpiFrequency(
+    field: FormFields,
+    formId: number,
+    frequencyId: number,
+    periodStartDate?: string | null,
+  ): Promise<void> {
+    const frequency = await this.assertFrequencyExists(frequencyId);
+    this.assertPeriodStartAllowed(frequency.code, periodStartDate);
+
+    if (field.kpiId !== null) {
+      const kpi = await this.kpiRepo.findOne({ where: { kpiId: field.kpiId } });
+      if (!kpi) {
+        throw new NotFoundException(`KPI with id ${field.kpiId} not found`);
+      }
+      kpi.frequencyId = frequencyId;
+      if (periodStartDate !== undefined) {
+        kpi.referenceDate =
+          periodStartDate === null
+            ? null
+            : this.toReferenceDate(periodStartDate);
+      }
+      await this.kpiRepo.save(kpi);
+      return;
+    }
+
+    const form = await this.formsRepo.findOne({ where: { formId } });
+    if (!form) {
+      throw new NotFoundException(`Form with id ${formId} not found`);
+    }
+    if (form.directorateId === null) {
+      throw new BadRequestException(
+        'Form must have a directorateId before a field KPI can be auto-created',
+      );
+    }
+
+    const kpiCode = await this.buildUniqueKpiCode(form.formKey, field.fieldKey);
+    const kpi = this.kpiRepo.create({
+      kpiCode,
+      nameEn: field.labelEn,
+      nameAr: field.labelAr,
+      directorateId: form.directorateId,
+      dataTypeId: field.dataTypeId,
+      frequencyId,
+      referenceDate:
+        periodStartDate === undefined || periodStartDate === null
+          ? null
+          : this.toReferenceDate(periodStartDate),
+      isActive: true,
+    });
+    const savedKpi = await this.kpiRepo.save(kpi);
+
+    field.kpiId = savedKpi.kpiId;
+    await this.fieldsRepo.save(field);
+  }
+
+  /** Updates only KpiDefinitions.ReferenceDate on an existing field KPI. */
+  private async updateFieldKpiPeriodStart(
+    field: FormFields,
+    periodStartDate: string | null,
+  ): Promise<void> {
+    if (field.kpiId === null) {
+      throw new BadRequestException(
+        'Field has no linked KPI — cannot update periodStartDate',
+      );
+    }
+
+    const kpi = await this.kpiRepo.findOne({
+      where: { kpiId: field.kpiId },
+      relations: { frequency: true },
+    });
+
+    if (!kpi) {
+      throw new NotFoundException(`KPI with id ${field.kpiId} not found`);
+    }
+
+    if (kpi.frequency) {
+      this.assertPeriodStartAllowed(kpi.frequency.code, periodStartDate);
+    }
+
+    kpi.referenceDate =
+      periodStartDate === null ? null : this.toReferenceDate(periodStartDate);
+    await this.kpiRepo.save(kpi);
+  }
+
+  /** Prefers an explicit frequencyId; otherwise uses the form default. Both are validated when set. */
+  private async resolveFrequencyId(
+    requestedFrequencyId: number | undefined,
+    formFrequencyId: number | null,
+  ): Promise<number | null> {
+    if (requestedFrequencyId !== undefined) {
+      await this.assertFrequencyExists(requestedFrequencyId);
+      return requestedFrequencyId;
+    }
+
+    if (formFrequencyId !== null) {
+      await this.assertFrequencyExists(formFrequencyId);
+      return formFrequencyId;
+    }
+
+    return null;
+  }
+
+  private async assertFrequencyExists(
+    frequencyId: number,
+  ): Promise<Frequencies> {
+    const frequency = await this.frequenciesRepo.findOne({
+      where: { frequencyId, isActive: true },
+    });
+
+    if (!frequency) {
+      throw new NotFoundException(`Frequency with id ${frequencyId} not found`);
+    }
+
+    return frequency;
+  }
+
+  /** Loads KPI frequency, computed calendar windows, and submitted period rows. */
+  private async buildFieldFrequencyResponse(
+    fieldId: number,
+    query: FrequencyPeriodsQueryDto,
+  ): Promise<FieldFrequencyResponse> {
+    const field = await this.fieldsRepo.findOne({
+      where: { fieldId },
+      relations: { kpi: { frequency: true } },
+    });
+
+    if (!field) {
+      throw new NotFoundException(`Field with id ${fieldId} not found`);
+    }
+
+    const year = query.year ?? new Date().getUTCFullYear();
+    const frequency = field.kpi?.frequency ?? null;
+    const frequencySummary = frequency
+      ? this.toFrequencySummary(frequency)
+      : null;
+    const storedPeriodStart = field.kpi?.referenceDate
+      ? formatDateOnly(field.kpi.referenceDate)
+      : null;
+
+    const expectedPeriods =
+      frequency === null
+        ? []
+        : generateExpectedPeriods(frequency.code, {
+            year,
+            month: query.month,
+            anchor: this.resolveGenerateAnchor(query, field.kpi?.referenceDate),
+          });
+
+    const submittedPeriods = await this.findSubmittedPeriods(
+      field.kpiId,
+      year,
+      query.month,
+    );
+
+    return {
+      fieldId: field.fieldId,
+      kpiId: field.kpiId,
+      frequencyId: field.kpi?.frequencyId ?? null,
+      frequency: frequencySummary,
+      periodStartDate: storedPeriodStart,
+      expectedPeriods,
+      submittedPeriods,
+    };
+  }
+
+  private toFrequencySummary(frequency: Frequencies): FrequencySummary {
+    return {
+      frequencyId: frequency.frequencyId,
+      code: frequency.code,
+      nameEn: frequency.nameEn,
+      nameAr: frequency.nameAr,
+      description: frequency.description,
+      hasDiscretePeriods: hasDiscretePeriods(frequency.code),
+      supportsCustomPeriodStart: supportsCustomPeriodStart(frequency.code),
+    };
+  }
+
+  /**
+   * Query periodStartDate (preview) wins; otherwise the stored KPI ReferenceDate.
+   */
+  private resolveGenerateAnchor(
+    query: FrequencyPeriodsQueryDto,
+    referenceDate: Date | string | null | undefined,
+  ): PeriodAnchor | undefined {
+    if (query.periodStartDate !== undefined) {
+      const parsed = parsePeriodStartDate(query.periodStartDate);
+      if (!parsed) {
+        throw new BadRequestException(
+          `Invalid periodStartDate "${query.periodStartDate}". Use a real calendar date (YYYY-MM-DD).`,
+        );
+      }
+      return parsed;
+    }
+
+    if (referenceDate) {
+      return periodAnchorFromDate(referenceDate);
+    }
+
+    return undefined;
+  }
+
+  /** Rejects custom starts on ONGOING / ON_DEMAND / DAILY / WEEKLY. */
+  private assertPeriodStartAllowed(
+    code: string,
+    periodStartDate: string | null | undefined,
+  ): void {
+    if (periodStartDate === undefined || periodStartDate === null) {
+      return;
+    }
+
+    const anchor = parsePeriodStartDate(periodStartDate);
+    if (!anchor) {
+      throw new BadRequestException(
+        `Invalid periodStartDate "${periodStartDate}". Use a real calendar date (YYYY-MM-DD).`,
+      );
+    }
+
+    if (anchor.month === 1 && anchor.day === 1) {
+      return;
+    }
+
+    if (!supportsCustomPeriodStart(code)) {
+      throw new BadRequestException(
+        `Frequency ${code} does not support a custom period start date`,
+      );
+    }
+  }
+
+  /** Converts YYYY-MM-DD into a UTC Date for the date column. */
+  private toReferenceDate(value: string): Date {
+    const parsed = parsePeriodStartDate(value);
+    if (!parsed) {
+      throw new BadRequestException(
+        `Invalid periodStartDate "${value}". Use a real calendar date (YYYY-MM-DD).`,
+      );
+    }
+
+    return new Date(
+      Date.UTC(Number(value.trim().slice(0, 4)), parsed.month - 1, parsed.day),
+    );
+  }
+
+  /** Reads dbo.KpiSubmissionPeriods for the field's KPI, filtered by year (and month). */
+  private async findSubmittedPeriods(
+    kpiId: number | null,
+    year: number,
+    month?: number,
+  ): Promise<SubmittedPeriod[]> {
+    if (kpiId === null) {
+      return [];
+    }
+
+    const fromDate =
+      month === undefined
+        ? `${String(year)}-01-01`
+        : `${String(year)}-${String(month).padStart(2, '0')}-01`;
+
+    const toDate =
+      month === undefined
+        ? `${String(year)}-12-31`
+        : this.lastCalendarDay(year, month);
+
+    const rows = await this.periodsRepo
+      .createQueryBuilder('period')
+      .where('period.kpiId = :kpiId', { kpiId })
+      .andWhere('period.periodStartDate >= :fromDate', { fromDate })
+      .andWhere('period.periodStartDate <= :toDate', { toDate })
+      .orderBy('period.periodStartDate', 'ASC')
+      .getMany();
+
+    return rows.map((row) => ({
+      kpiSubmissionPeriodId: row.kpiSubmissionPeriodId,
+      submissionId: row.submissionId,
+      directorateId: row.directorateId,
+      kpiId: row.kpiId,
+      frequencyId: row.frequencyId,
+      periodStartDate: formatDateOnly(row.periodStartDate),
+      submissionStatus: row.submissionStatus,
+      createdAt: row.createdAt,
+    }));
+  }
+
+  /** Last day of a 1-based month as YYYY-MM-DD (UTC). */
+  private lastCalendarDay(year: number, month: number): string {
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return `${String(year)}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   }
 
   /** Reloads a field with KPI + sub-relations and maps to the API response shape */

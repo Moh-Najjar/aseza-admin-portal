@@ -1,9 +1,15 @@
 import { FormFields } from '../../../entities/FormFields';
+import {
+  FrequencySummary,
+  hasDiscretePeriods,
+  supportsCustomPeriodStart,
+  formatDateOnly,
+} from '../../../common/frequency/frequency-periods';
 
 /**
  * API response shape for a form field.
- * `isActive` is projected from dbo.KpiDefinitions.IsActive via the field's KpiId FK —
- * it is NOT a column on dbo.FormFields.
+ * `isActive` and `frequency` are projected from dbo.KpiDefinitions via the field's KpiId FK —
+ * they are NOT columns on dbo.FormFields.
  */
 export interface FormFieldResponse {
   fieldId: number;
@@ -34,6 +40,15 @@ export interface FormFieldResponse {
   kpiId: number | null;
   /** Active flag from linked KPI — null when the field has no KpiId */
   isActive: boolean | null;
+  /** FrequencyId from linked KPI — null when the field has no KPI or the KPI has no frequency */
+  frequencyId: number | null;
+  /** Catalog frequency from linked KPI — null when unassigned */
+  frequency: FrequencySummary | null;
+  /**
+   * Recurring period start (YYYY-MM-DD) from KpiDefinitions.ReferenceDate.
+   * Month+day repeat every cycle — e.g. 2026-02-01 = first of February.
+   */
+  periodStartDate: string | null;
   fieldOptions: FormFields['fieldOptions'];
   fieldDependencies: FormFields['fieldDependencies'];
   formFieldColumns: FormFields['formFieldColumns'];
@@ -43,7 +58,7 @@ export interface FormFieldResponse {
 
 /** Relation graph loaded whenever fields are returned to the client */
 export const FIELD_RESPONSE_RELATIONS = {
-  kpi: true,
+  kpi: { frequency: true },
   fieldOptions: true,
   fieldDependencies: true,
   formFieldColumns: true,
@@ -52,8 +67,8 @@ export const FIELD_RESPONSE_RELATIONS = {
 } as const;
 
 /**
- * Maps a FormFields entity (with optional kpi relation) to the API response.
- * Strips the nested kpi object — exposes only kpi.isActive as a top-level flag.
+ * Maps a FormFields entity (with optional kpi + frequency relations) to the API response.
+ * Strips nested kpi/frequency entities — exposes isActive, frequencyId, and frequency summary.
  */
 export function mapFormFieldToResponse(field: FormFields): FormFieldResponse {
   return {
@@ -84,10 +99,40 @@ export function mapFormFieldToResponse(field: FormFields): FormFieldResponse {
     lookupTypeId: field.lookupTypeId,
     kpiId: field.kpiId,
     isActive: field.kpi?.isActive ?? null,
+    frequencyId: field.kpi?.frequencyId ?? null,
+    frequency: mapFrequencySummary(field),
+    periodStartDate: mapPeriodStartDate(field),
     fieldOptions: field.fieldOptions ?? [],
     fieldDependencies: field.fieldDependencies ?? [],
     formFieldColumns: field.formFieldColumns ?? [],
     formFieldRows: field.formFieldRows ?? [],
     formFieldCalculations: field.formFieldCalculations ?? null,
   };
+}
+
+/** Projects the KPI's catalog frequency, or null when the field/KPI has none. */
+function mapFrequencySummary(field: FormFields): FrequencySummary | null {
+  const frequency = field.kpi?.frequency;
+  if (!frequency) {
+    return null;
+  }
+
+  return {
+    frequencyId: frequency.frequencyId,
+    code: frequency.code,
+    nameEn: frequency.nameEn,
+    nameAr: frequency.nameAr,
+    description: frequency.description,
+    hasDiscretePeriods: hasDiscretePeriods(frequency.code),
+    supportsCustomPeriodStart: supportsCustomPeriodStart(frequency.code),
+  };
+}
+
+/** Projects KpiDefinitions.ReferenceDate as YYYY-MM-DD, or null when unset. */
+function mapPeriodStartDate(field: FormFields): string | null {
+  const referenceDate = field.kpi?.referenceDate;
+  if (!referenceDate) {
+    return null;
+  }
+  return formatDateOnly(referenceDate);
 }

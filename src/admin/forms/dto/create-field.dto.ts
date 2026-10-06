@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsPositive,
+  IsDateString,
   IsString,
   MaxLength,
   Min,
@@ -15,22 +16,22 @@ export class CreateFieldDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  fieldKey: string;
+  fieldKey!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  labelEn: string;
+  labelEn!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  labelAr: string;
+  labelAr!: string;
 
   /** FK to dbo.DataTypes — e.g. TEXT, NUMBER, DATE, BOOLEAN */
   @IsInt()
   @IsPositive()
-  dataTypeId: number;
+  dataTypeId!: number;
 
   /**
    * FK to dbo.ControlTypes — e.g. TEXTBOX, DROPDOWN, CHECKBOX, DATE_PICKER,
@@ -38,12 +39,12 @@ export class CreateFieldDto {
    */
   @IsInt()
   @IsPositive()
-  controlTypeId: number;
+  controlTypeId!: number;
 
   /** 1-based display order within the form */
   @IsInt()
   @Min(1)
-  displayOrder: number;
+  displayOrder!: number;
 
   /** FK to dbo.LookupTypes — required when controlType is DROPDOWN or RADIO */
   @IsOptional()
@@ -56,6 +57,24 @@ export class CreateFieldDto {
   @IsInt()
   @IsPositive()
   kpiId?: number;
+
+  /**
+   * FK to dbo.Frequencies — how often this field's KPI is reported.
+   * Applied to the linked/auto-created KpiDefinitions row.
+   * Falls back to the parent form's frequencyId when omitted.
+   */
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  frequencyId?: number;
+
+  /**
+   * Recurring period start (YYYY-MM-DD). Stored on KpiDefinitions.ReferenceDate.
+   * Example: "2026-02-01" with ANNUALLY = first of February every year.
+   */
+  @IsOptional()
+  @IsDateString()
+  periodStartDate?: string;
 
   @IsOptional()
   @IsBoolean()

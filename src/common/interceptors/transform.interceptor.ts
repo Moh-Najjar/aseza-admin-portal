@@ -9,6 +9,7 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ApiResponse } from '../interfaces/api-response.interface';
 
+/** Interceptor that wraps every successful response in { success, statusCode, message, data, timestamp } */
 @Injectable()
 export class TransformInterceptor<T> implements NestInterceptor<
   T,

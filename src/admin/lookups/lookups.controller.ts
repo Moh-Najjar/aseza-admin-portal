@@ -3,12 +3,14 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { LookupsService } from './lookups.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { FrequencyPeriodsQueryDto } from '../../common/dto/frequency-periods-query.dto';
 
 /** Read-only metadata endpoints used to populate form-builder dropdowns */
 @Controller('admin/lookups')
@@ -45,5 +47,17 @@ export class LookupsController {
   @Get('frequencies')
   getFrequencies() {
     return this.lookupsService.findFrequencies();
+  }
+
+  /**
+   * GET /admin/lookups/frequencies/:frequencyId/periods
+   * Preview calendar windows for a frequency before assigning it to a field.
+   */
+  @Get('frequencies/:frequencyId/periods')
+  getFrequencyPeriods(
+    @Param('frequencyId', ParseIntPipe) frequencyId: number,
+    @Query() query: FrequencyPeriodsQueryDto,
+  ) {
+    return this.lookupsService.findFrequencyPeriods(frequencyId, query);
   }
 }

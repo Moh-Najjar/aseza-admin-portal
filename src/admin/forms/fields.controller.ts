@@ -9,6 +9,8 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { FieldsService } from './fields.service';
@@ -18,14 +20,19 @@ import { CreateOptionDto } from './dto/create-option.dto';
 import { CreateDependencyDto } from './dto/create-dependency.dto';
 import { CreateColumnDto } from './dto/create-column.dto';
 import { CreateRowDto } from './dto/create-row.dto';
+import { UpdateColumnDto } from './dto/update-column.dto';
+import { UpdateRowDto } from './dto/update-row.dto';
+import { AssignFieldFrequencyDto } from './dto/assign-field-frequency.dto';
 import {
   CreateCalculationDto,
   CreateCalculationInputDto,
 } from './dto/create-calculation.dto';
+import { FrequencyPeriodsQueryDto } from '../../common/dto/frequency-periods-query.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { FormFieldResponse } from './mappers/form-field.mapper';
+import { FieldFrequencyResponse } from './fields.service';
 import { FieldOptions } from '../../entities/FieldOptions';
 import { FieldDependencies } from '../../entities/FieldDependencies';
 import { FormFieldColumns } from '../../entities/FormFieldColumns';
@@ -78,6 +85,37 @@ export class FieldsController {
     @Param('fieldId', ParseIntPipe) fieldId: number,
   ): Promise<void> {
     return this.fieldsService.removeField(formId, fieldId);
+  }
+
+  // ── Frequency (catalog type + period windows) ─────────────────────────────
+
+  /**
+   * GET /admin/forms/:formId/fields/:fieldId/frequency
+   * Returns the field's KPI frequency, expected calendar windows, and submitted periods.
+   */
+  @Get(':fieldId/frequency')
+  getFieldFrequency(
+    @Param('formId', ParseIntPipe) formId: number,
+    @Param('fieldId', ParseIntPipe) fieldId: number,
+    @Query() query: FrequencyPeriodsQueryDto,
+  ): Promise<FieldFrequencyResponse> {
+    return this.fieldsService.getFieldFrequency(formId, fieldId, query);
+  }
+
+  /**
+   * PUT /admin/forms/:formId/fields/:fieldId/frequency
+   * Assigns a dbo.Frequencies row to the field's KPI, optionally with a
+   * recurring period start date (KpiDefinitions.ReferenceDate).
+   * Body: { frequencyId, periodStartDate?: "2026-02-01" | null }
+   */
+  @Put(':fieldId/frequency')
+  assignFieldFrequency(
+    @Param('formId', ParseIntPipe) formId: number,
+    @Param('fieldId', ParseIntPipe) fieldId: number,
+    @Body() dto: AssignFieldFrequencyDto,
+    @Query() query: FrequencyPeriodsQueryDto,
+  ): Promise<FieldFrequencyResponse> {
+    return this.fieldsService.assignFieldFrequency(formId, fieldId, dto, query);
   }
 
   // ── Options (DROPDOWN / RADIO / MULTI_SELECT) ─────────────────────────────
@@ -141,6 +179,20 @@ export class FieldsController {
     return this.fieldsService.addColumn(formId, fieldId, dto);
   }
 
+  /**
+   * PATCH /admin/forms/:formId/fields/:fieldId/columns/:columnId
+   * Partially updates labelEn / labelAr / isRequired. Keys and types are not editable.
+   */
+  @Patch(':fieldId/columns/:columnId')
+  updateColumn(
+    @Param('formId', ParseIntPipe) formId: number,
+    @Param('fieldId', ParseIntPipe) fieldId: number,
+    @Param('columnId', ParseIntPipe) columnId: number,
+    @Body() dto: UpdateColumnDto,
+  ): Promise<FormFieldColumns> {
+    return this.fieldsService.updateColumn(formId, fieldId, columnId, dto);
+  }
+
   /** DELETE /admin/forms/:formId/fields/:fieldId/columns/:columnId */
   @Delete(':fieldId/columns/:columnId')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -163,6 +215,20 @@ export class FieldsController {
     @Body() dto: CreateRowDto,
   ): Promise<FormFieldRows> {
     return this.fieldsService.addRow(formId, fieldId, dto);
+  }
+
+  /**
+   * PATCH /admin/forms/:formId/fields/:fieldId/rows/:rowId
+   * Partially updates labelEn / labelAr / isRequired. RowKey is not editable.
+   */
+  @Patch(':fieldId/rows/:rowId')
+  updateRow(
+    @Param('formId', ParseIntPipe) formId: number,
+    @Param('fieldId', ParseIntPipe) fieldId: number,
+    @Param('rowId', ParseIntPipe) rowId: number,
+    @Body() dto: UpdateRowDto,
+  ): Promise<FormFieldRows> {
+    return this.fieldsService.updateRow(formId, fieldId, rowId, dto);
   }
 
   /** DELETE /admin/forms/:formId/fields/:fieldId/rows/:rowId */

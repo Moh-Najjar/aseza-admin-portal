@@ -12,7 +12,7 @@ export class CreateDependencyDto {
   /** The field whose value triggers this rule */
   @IsInt()
   @IsPositive()
-  dependsOnFieldId: number;
+  dependsOnFieldId!: number;
 
   /**
    * Comparison operator applied to the trigger field's value.
@@ -31,12 +31,12 @@ export class CreateDependencyDto {
     'IS_EMPTY',
     'IS_NOT_EMPTY',
   ])
-  conditionOperator: string;
+  conditionOperator!: string;
 
   /** The value to compare against (ignored for IS_EMPTY / IS_NOT_EMPTY) */
   @IsString()
   @MaxLength(200)
-  conditionValue: string;
+  conditionValue!: string;
 
   /**
    * What to do when the condition is met.
@@ -44,5 +44,5 @@ export class CreateDependencyDto {
    */
   @IsString()
   @IsIn(['SHOW', 'HIDE', 'REQUIRE', 'DISABLE'])
-  action: string;
+  action!: string;
 }

@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -14,35 +15,40 @@ export class CreateColumnDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  columnKey: string;
+  columnKey!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  labelEn: string;
+  labelEn!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  labelAr: string;
+  labelAr!: string;
 
   @IsInt()
   @Min(0)
-  displayOrder: number;
+  displayOrder!: number;
 
   /** FK to dbo.DataTypes */
   @IsInt()
   @IsPositive()
-  dataTypeId: number;
+  dataTypeId!: number;
 
   /** FK to dbo.ControlTypes */
   @IsInt()
   @IsPositive()
-  controlTypeId: number;
+  controlTypeId!: number;
 
   /** FK to dbo.LookupTypes — required if column is a dropdown */
   @IsOptional()
   @IsInt()
   @IsPositive()
   lookupTypeId?: number;
+
+  /** Whether a value is required in every cell of this column — stored as null when omitted */
+  @IsOptional()
+  @IsBoolean()
+  isRequired?: boolean;
 }

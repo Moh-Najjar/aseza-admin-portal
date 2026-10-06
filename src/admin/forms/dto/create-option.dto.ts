@@ -14,27 +14,27 @@ export class CreateOptionDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  optionKey: string;
+  optionKey!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  optionLabelEn: string;
+  optionLabelEn!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  optionLabelAr: string;
+  optionLabelAr!: string;
 
   /** Stored value submitted with the form */
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  optionValue: string;
+  optionValue!: string;
 
   @IsInt()
   @Min(0)
-  displayOrder: number;
+  displayOrder!: number;
 
   @IsOptional()
   @IsBoolean()

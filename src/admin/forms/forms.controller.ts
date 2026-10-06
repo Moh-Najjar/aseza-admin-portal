@@ -42,7 +42,9 @@ export class FormsController {
    * Returns a single form with ALL its fields and every field's sub-relations.
    */
   @Get(':formId')
-  getForm(@Param('formId', ParseIntPipe) formId: number): Promise<FormDetailResponse> {
+  getForm(
+    @Param('formId', ParseIntPipe) formId: number,
+  ): Promise<FormDetailResponse> {
     return this.formsService.findOne(formId);
   }
 
