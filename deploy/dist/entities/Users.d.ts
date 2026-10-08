@@ -1,0 +1,34 @@
+import { DirectorateFormAccess } from './DirectorateFormAccess';
+import { Forms } from './Forms';
+import { FormSubmissions } from './FormSubmissions';
+import { FormVersions } from './FormVersions';
+import { LoginAuditLogs } from './LoginAuditLogs';
+import { SubmissionAuditLogs } from './SubmissionAuditLogs';
+import { UserRoles } from './UserRoles';
+import { Directorates } from './Directorates';
+import { UserSessions } from './UserSessions';
+export declare class Users {
+    userId: number;
+    externalObjectId: string | null;
+    username: string;
+    fullNameEn: string;
+    fullNameAr: string | null;
+    email: string;
+    isActive: boolean;
+    lastLoginAt: Date | null;
+    createdAt: Date;
+    directorateFormAccesses: DirectorateFormAccess[];
+    forms: Forms[];
+    forms2: Forms[];
+    formSubmissions: FormSubmissions[];
+    formSubmissions2: FormSubmissions[];
+    formSubmissions3: FormSubmissions[];
+    formVersions: FormVersions[];
+    loginAuditLogs: LoginAuditLogs[];
+    submissionAuditLogs: SubmissionAuditLogs[];
+    userRoles: UserRoles[];
+    userRoles2: UserRoles[];
+    directorateId: number | null;
+    directorate: Directorates;
+    userSessions: UserSessions[];
+}

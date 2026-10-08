@@ -9,26 +9,38 @@ import {
 import { Transform, Type } from 'class-transformer';
 
 export class UsersQueryDto {
-  /** 1-based page number; defaults to 1 */
+  /**
+   * 1-based page number; defaults to 1
+   * @example 1
+   */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page?: number = 1;
 
-  /** Number of results per page; defaults to 20, max enforced in service */
+  /**
+   * Number of results per page; defaults to 20, max enforced in service
+   * @example 20
+   */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @IsPositive()
   pageSize?: number = 20;
 
-  /** Free-text filter applied to Username and Email (case-insensitive LIKE) */
+  /**
+   * Free-text filter applied to Username and Email (case-insensitive LIKE)
+   * @example "ahmad"
+   */
   @IsOptional()
   @IsString()
   search?: string;
 
-  /** When provided, filters by IsActive flag */
+  /**
+   * When provided, filters by IsActive flag
+   * @example true
+   */
   @IsOptional()
   @Transform(({ value }: { value: string }) => {
     if (value === 'true') return true;

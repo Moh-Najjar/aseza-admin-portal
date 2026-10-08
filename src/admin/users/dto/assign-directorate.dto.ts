@@ -4,6 +4,7 @@ export class AssignDirectorateDto {
   /**
    * ID of the directorate to assign.
    * Send null (or omit entirely) to remove the current assignment.
+   * @example 3
    */
   @ValidateIf((o: AssignDirectorateDto) => o.directorateId !== null)
   @IsOptional()

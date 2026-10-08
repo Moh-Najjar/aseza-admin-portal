@@ -8,7 +8,10 @@ import {
 
 /** Assigns a catalog frequency, optionally with a recurring period start date. */
 export class AssignFieldFrequencyDto {
-  /** FK to dbo.Frequencies — e.g. MONTHLY, QUARTERLY, ANNUALLY, ON_DEMAND */
+  /**
+   * FK to dbo.Frequencies — e.g. MONTHLY, QUARTERLY, ANNUALLY, ON_DEMAND
+   * @example 3
+   */
   @IsInt()
   @IsPositive()
   frequencyId: number;
@@ -18,6 +21,7 @@ export class AssignFieldFrequencyDto {
    * Only the month and day are used each year.
    * Example: "2026-02-01" + ANNUALLY → 1 Feb 2026 through 31 Jan 2027.
    * Send null to reset to the default calendar (1 January).
+   * @example "2026-02-01"
    */
   @ValidateIf((_, value: unknown) => value !== null)
   @IsOptional()

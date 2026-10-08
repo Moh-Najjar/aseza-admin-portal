@@ -9,7 +9,10 @@ import {
 
 /** Conditional show/hide/require rule between two fields */
 export class CreateDependencyDto {
-  /** The field whose value triggers this rule */
+  /**
+   * The field whose value triggers this rule
+   * @example 12
+   */
   @IsInt()
   @IsPositive()
   dependsOnFieldId!: number;
@@ -17,6 +20,7 @@ export class CreateDependencyDto {
   /**
    * Comparison operator applied to the trigger field's value.
    * Accepted: EQ | NEQ | GT | GTE | LT | LTE | CONTAINS | IS_EMPTY | IS_NOT_EMPTY
+   * @example "EQ"
    */
   @IsString()
   @IsNotEmpty()
@@ -33,7 +37,10 @@ export class CreateDependencyDto {
   ])
   conditionOperator!: string;
 
-  /** The value to compare against (ignored for IS_EMPTY / IS_NOT_EMPTY) */
+  /**
+   * The value to compare against (ignored for IS_EMPTY / IS_NOT_EMPTY)
+   * @example "YES"
+   */
   @IsString()
   @MaxLength(200)
   conditionValue!: string;
@@ -41,6 +48,7 @@ export class CreateDependencyDto {
   /**
    * What to do when the condition is met.
    * Accepted: SHOW | HIDE | REQUIRE | DISABLE
+   * @example "SHOW"
    */
   @IsString()
   @IsIn(['SHOW', 'HIDE', 'REQUIRE', 'DISABLE'])

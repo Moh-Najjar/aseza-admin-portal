@@ -15,6 +15,10 @@ import { isProvided, trimIfString } from './trim-if-string';
  * Omitted properties are skipped; explicit null is rejected.
  */
 export class UpdateRowDto {
+  /**
+   * Row label in English
+   * @example "Total"
+   */
   @ValidateIf(isProvided)
   @Transform(trimIfString)
   @IsString()
@@ -22,6 +26,10 @@ export class UpdateRowDto {
   @MaxLength(300)
   labelEn?: string;
 
+  /**
+   * Row label in Arabic
+   * @example "المجموع"
+   */
   @ValidateIf(isProvided)
   @Transform(trimIfString)
   @IsString()
@@ -29,6 +37,10 @@ export class UpdateRowDto {
   @MaxLength(300)
   labelAr?: string;
 
+  /**
+   * Whether every cell in this row must be filled
+   * @example false
+   */
   @ValidateIf(isProvided)
   @IsBoolean()
   isRequired?: boolean;

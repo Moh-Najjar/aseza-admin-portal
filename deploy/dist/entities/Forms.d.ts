@@ -1,0 +1,33 @@
+import { DirectorateFormAccess } from './DirectorateFormAccess';
+import { FormFields } from './FormFields';
+import { Directorates } from './Directorates';
+import { Users } from './Users';
+import { Frequencies } from './Frequencies';
+import { FormSubmissions } from './FormSubmissions';
+import { FormVersions } from './FormVersions';
+export declare class Forms {
+    formId: number;
+    formKey: string;
+    nameEn: string;
+    nameAr: string;
+    descriptionEn: string | null;
+    descriptionAr: string | null;
+    isActive: boolean;
+    version: number;
+    effectiveFrom: Date | null;
+    effectiveTo: Date | null;
+    createdAt: Date;
+    updatedAt: Date | null;
+    directorateId: number | null;
+    frequencyId: number | null;
+    createdByUserId: number | null;
+    updatedByUserId: number | null;
+    directorateFormAccesses: DirectorateFormAccess[];
+    formFields: FormFields[];
+    directorate: Directorates;
+    createdBy: Users;
+    updatedBy: Users;
+    frequency: Frequencies;
+    formSubmissions: FormSubmissions[];
+    formVersions: FormVersions[];
+}

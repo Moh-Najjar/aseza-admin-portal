@@ -12,6 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UsersService, PaginatedUsers } from './users.service';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { AssignDirectorateDto } from './dto/assign-directorate.dto';
@@ -26,6 +27,8 @@ import { Users } from '../../entities/Users';
 import { UserRoles } from '../../entities/UserRoles';
 
 /** Apply JWT + ADMIN guard to every route in this controller */
+@ApiTags('Users')
+@ApiBearerAuth()
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -36,6 +39,10 @@ export class UsersController {
    * GET /admin/users
    * Paginated list of users with optional search and isActive filter.
    */
+  @ApiOperation({
+    summary:
+      'Paginated list of users with optional search and isActive filter.',
+  })
   @Get('users')
   getUsers(@Query() query: UsersQueryDto): Promise<PaginatedUsers> {
     return this.usersService.findAll(query);
@@ -45,6 +52,9 @@ export class UsersController {
    * GET /admin/users/:userId/roles
    * Lists all role assignments for a specific user.
    */
+  @ApiOperation({
+    summary: 'Lists all role assignments for a specific user.',
+  })
   @Get('users/:userId/roles')
   getUserRoles(
     @Param('userId', ParseIntPipe) userId: number,
@@ -56,6 +66,10 @@ export class UsersController {
    * POST /admin/users/:userId/roles
    * Assigns a role to a user (idempotently refuses duplicate assignments).
    */
+  @ApiOperation({
+    summary: 'Assigns a role to a user.',
+    description: 'Fails if the user already has this role.',
+  })
   @Post('users/:userId/roles')
   @HttpCode(HttpStatus.CREATED)
   assignRole(
@@ -70,6 +84,9 @@ export class UsersController {
    * DELETE /admin/users/:userId/roles/:roleId
    * Removes a role assignment from a user.
    */
+  @ApiOperation({
+    summary: 'Removes a role assignment from a user.',
+  })
   @Delete('users/:userId/roles/:roleId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeRole(
@@ -84,6 +101,10 @@ export class UsersController {
    * Assigns or unassigns a directorate for a user.
    * Send { "directorateId": null } to unassign.
    */
+  @ApiOperation({
+    summary: 'Assigns or unassigns a directorate for a user.',
+    description: 'Send `{ "directorateId": null }` to unassign.',
+  })
   @Put('users/:userId/directorate')
   assignDirectorate(
     @Param('userId', ParseIntPipe) userId: number,
@@ -96,6 +117,10 @@ export class UsersController {
    * GET /admin/roles
    * Returns all available roles — used to populate role dropdowns in the UI.
    */
+  @ApiOperation({
+    summary:
+      'Returns all available roles — used to populate role dropdowns in the UI.',
+  })
   @Get('roles')
   getAllRoles() {
     return this.usersService.findAllRoles();

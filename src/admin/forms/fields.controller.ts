@@ -13,6 +13,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FieldsService } from './fields.service';
 import { CreateFieldDto } from './dto/create-field.dto';
 import { UpdateFieldDto } from './dto/update-field.dto';
@@ -41,6 +42,8 @@ import { FormFieldCalculations } from '../../entities/FormFieldCalculations';
 import { FormFieldCalculationInputs } from '../../entities/FormFieldCalculationInputs';
 
 /** Base path: /admin/forms/:formId/fields */
+@ApiTags('Form Fields')
+@ApiBearerAuth()
 @Controller('admin/forms/:formId/fields')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -50,6 +53,10 @@ export class FieldsController {
   // ── Fields ────────────────────────────────────────────────────────────────
 
   /** GET /admin/forms/:formId/fields — list all fields with sub-relations */
+  @ApiOperation({
+    summary:
+      'Lists all fields of the form with their options, dependencies, columns, rows and calculation.',
+  })
   @Get()
   getFields(
     @Param('formId', ParseIntPipe) formId: number,
@@ -58,6 +65,10 @@ export class FieldsController {
   }
 
   /** POST /admin/forms/:formId/fields — add a new field to the form */
+  @ApiOperation({
+    summary: 'Adds a new field to the form.',
+    description: 'A KPI definition is auto-created when kpiId is omitted.',
+  })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   addField(
@@ -68,6 +79,10 @@ export class FieldsController {
   }
 
   /** PATCH /admin/forms/:formId/fields/:fieldId — partially update a field */
+  @ApiOperation({
+    summary: 'Partially updates a field.',
+    description: 'Only provided properties are changed.',
+  })
   @Patch(':fieldId')
   updateField(
     @Param('formId', ParseIntPipe) formId: number,
@@ -78,6 +93,9 @@ export class FieldsController {
   }
 
   /** DELETE /admin/forms/:formId/fields/:fieldId — remove a field */
+  @ApiOperation({
+    summary: 'Removes a field from the form.',
+  })
   @Delete(':fieldId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeField(
@@ -93,6 +111,10 @@ export class FieldsController {
    * GET /admin/forms/:formId/fields/:fieldId/frequency
    * Returns the field's KPI frequency, expected calendar windows, and submitted periods.
    */
+  @ApiOperation({
+    summary:
+      "Returns the field's KPI frequency, expected calendar windows, and submitted periods.",
+  })
   @Get(':fieldId/frequency')
   getFieldFrequency(
     @Param('formId', ParseIntPipe) formId: number,
@@ -108,6 +130,11 @@ export class FieldsController {
    * recurring period start date (KpiDefinitions.ReferenceDate).
    * Body: { frequencyId, periodStartDate?: "2026-02-01" | null }
    */
+  @ApiOperation({
+    summary:
+      "Assigns a frequency to the field's KPI, optionally with a recurring period start date.",
+    description: 'Send `periodStartDate: null` to reset to 1 January.',
+  })
   @Put(':fieldId/frequency')
   assignFieldFrequency(
     @Param('formId', ParseIntPipe) formId: number,
@@ -121,6 +148,10 @@ export class FieldsController {
   // ── Options (DROPDOWN / RADIO / MULTI_SELECT) ─────────────────────────────
 
   /** POST /admin/forms/:formId/fields/:fieldId/options */
+  @ApiOperation({
+    summary:
+      'Adds a selectable option to a DROPDOWN / RADIO / MULTI_SELECT field.',
+  })
   @Post(':fieldId/options')
   @HttpCode(HttpStatus.CREATED)
   addOption(
@@ -132,6 +163,9 @@ export class FieldsController {
   }
 
   /** DELETE /admin/forms/:formId/fields/:fieldId/options/:optionId */
+  @ApiOperation({
+    summary: 'Removes a selectable option from the field.',
+  })
   @Delete(':fieldId/options/:optionId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeOption(
@@ -145,6 +179,10 @@ export class FieldsController {
   // ── Dependencies (show/hide/require rules) ────────────────────────────────
 
   /** POST /admin/forms/:formId/fields/:fieldId/dependencies */
+  @ApiOperation({
+    summary:
+      "Adds a show / hide / require / disable rule triggered by another field's value.",
+  })
   @Post(':fieldId/dependencies')
   @HttpCode(HttpStatus.CREATED)
   addDependency(
@@ -156,6 +194,9 @@ export class FieldsController {
   }
 
   /** DELETE /admin/forms/:formId/fields/:fieldId/dependencies/:dependencyId */
+  @ApiOperation({
+    summary: 'Removes a dependency rule from the field.',
+  })
   @Delete(':fieldId/dependencies/:dependencyId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeDependency(
@@ -169,6 +210,9 @@ export class FieldsController {
   // ── Table Columns (TABLE / GRID fields) ───────────────────────────────────
 
   /** POST /admin/forms/:formId/fields/:fieldId/columns */
+  @ApiOperation({
+    summary: 'Adds a column to a TABLE / GRID field.',
+  })
   @Post(':fieldId/columns')
   @HttpCode(HttpStatus.CREATED)
   addColumn(
@@ -183,6 +227,11 @@ export class FieldsController {
    * PATCH /admin/forms/:formId/fields/:fieldId/columns/:columnId
    * Partially updates labelEn / labelAr / isRequired. Keys and types are not editable.
    */
+  @ApiOperation({
+    summary:
+      'Partially updates the labelEn / labelAr / isRequired of a column.',
+    description: 'Keys and types are not editable.',
+  })
   @Patch(':fieldId/columns/:columnId')
   updateColumn(
     @Param('formId', ParseIntPipe) formId: number,
@@ -194,6 +243,9 @@ export class FieldsController {
   }
 
   /** DELETE /admin/forms/:formId/fields/:fieldId/columns/:columnId */
+  @ApiOperation({
+    summary: 'Removes a column from a TABLE / GRID field.',
+  })
   @Delete(':fieldId/columns/:columnId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeColumn(
@@ -207,6 +259,9 @@ export class FieldsController {
   // ── Table Rows (TABLE / GRID fields) ──────────────────────────────────────
 
   /** POST /admin/forms/:formId/fields/:fieldId/rows */
+  @ApiOperation({
+    summary: 'Adds a row to a TABLE / GRID field.',
+  })
   @Post(':fieldId/rows')
   @HttpCode(HttpStatus.CREATED)
   addRow(
@@ -221,6 +276,10 @@ export class FieldsController {
    * PATCH /admin/forms/:formId/fields/:fieldId/rows/:rowId
    * Partially updates labelEn / labelAr / isRequired. RowKey is not editable.
    */
+  @ApiOperation({
+    summary: 'Partially updates the labelEn / labelAr / isRequired of a row.',
+    description: 'RowKey is not editable.',
+  })
   @Patch(':fieldId/rows/:rowId')
   updateRow(
     @Param('formId', ParseIntPipe) formId: number,
@@ -232,6 +291,9 @@ export class FieldsController {
   }
 
   /** DELETE /admin/forms/:formId/fields/:fieldId/rows/:rowId */
+  @ApiOperation({
+    summary: 'Removes a row from a TABLE / GRID field.',
+  })
   @Delete(':fieldId/rows/:rowId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeRow(
@@ -248,6 +310,10 @@ export class FieldsController {
    * POST /admin/forms/:formId/fields/:fieldId/calculation
    * Creates or replaces the calculation for a field (includes inputs inline).
    */
+  @ApiOperation({
+    summary:
+      'Creates or replaces the calculation for a CALCULATED field, including its inputs.',
+  })
   @Post(':fieldId/calculation')
   @HttpCode(HttpStatus.OK)
   setCalculation(
@@ -262,6 +328,9 @@ export class FieldsController {
    * DELETE /admin/forms/:formId/fields/:fieldId/calculation
    * Removes the calculation and all its inputs.
    */
+  @ApiOperation({
+    summary: 'Removes the calculation and all its inputs.',
+  })
   @Delete(':fieldId/calculation')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeCalculation(
@@ -275,6 +344,9 @@ export class FieldsController {
    * POST /admin/forms/:formId/fields/:fieldId/calculation/inputs
    * Adds a single input to an existing calculation.
    */
+  @ApiOperation({
+    summary: 'Adds a single input to an existing calculation.',
+  })
   @Post(':fieldId/calculation/inputs')
   @HttpCode(HttpStatus.CREATED)
   addCalculationInput(
@@ -288,6 +360,9 @@ export class FieldsController {
   /**
    * DELETE /admin/forms/:formId/fields/:fieldId/calculation/inputs/:inputId
    */
+  @ApiOperation({
+    summary: 'Removes a single input from the calculation.',
+  })
   @Delete(':fieldId/calculation/inputs/:inputId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeCalculationInput(
